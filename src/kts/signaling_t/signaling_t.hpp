@@ -1,0 +1,188 @@
+#pragma once
+
+#include <cstdint>
+#include <queue>
+#include <unordered_set>
+#include <utility>
+#include <variant>
+
+namespace kts
+{
+
+template<typename T>
+class SignalingT
+{
+public:
+    using IdT = std::uint_fast64_t;
+
+    struct EventDefaultConstructed
+    {
+        IdT id;
+    };
+
+    struct EventCopyConstructed
+    {
+        IdT id;
+        IdT from_id;
+    };
+
+    struct EventMoveConstructed
+    {
+        IdT id;
+        IdT from_id;
+    };
+
+    struct EventValueConstructed
+    {
+        IdT id;
+        T from_value;
+    };
+
+    struct EventCopyAssigned
+    {
+        IdT id;
+        IdT from_id;
+    };
+
+    struct EventMoveAssigned
+    {
+        IdT id;
+        IdT from_id;
+    };
+
+    struct EventValueAssigned
+    {
+        IdT id;
+        T from_value;
+    };
+
+    struct EventSwapped
+    {
+        IdT id;
+        IdT with_id;
+    };
+
+    struct EventDestroyed
+    {
+        IdT id;
+    };
+
+    using Event =
+        std::variant<EventDefaultConstructed, EventCopyConstructed, EventMoveConstructed, EventValueConstructed,
+                     EventCopyAssigned, EventMoveAssigned, EventValueAssigned, EventSwapped, EventDestroyed>;
+
+private:
+    struct EventListenerConstructorKey
+    {
+    };
+
+public:
+    class EventListener
+    {
+    public:
+        EventListener( [[maybe_unused]] EventListenerConstructorKey )
+        {
+            Connect();
+        }
+
+        EventListener( const EventListener & ) = delete;
+        EventListener( EventListener && ) = delete;
+        EventListener &operator=( const EventListener & ) = delete;
+        EventListener &operator=( EventListener && ) = delete;
+
+        ~EventListener()
+        {
+            Disconnect();
+        }
+
+        void Connect()
+        {
+            s_EventListeners.emplace( this );
+        }
+
+        void Disconnect()
+        {
+            s_EventListeners.erase( this );
+        }
+
+    private:
+        std::queue<Event> events;
+    };
+
+    SignalingT() noexcept( std::is_nothrow_default_constructible_v<T> )
+    {
+        Emit( EventDefaultConstructed{ m_Id } );
+    }
+
+    SignalingT( const SignalingT &other ) noexcept( std::is_nothrow_copy_constructible_v<T> )
+        : m_Value{ other.m_Value }
+    {
+        Emit( EventCopyConstructed{ m_Id, other.m_Id } );
+    }
+
+    SignalingT( SignalingT &&other ) noexcept( std::is_nothrow_move_constructible_v<T> )
+        : m_Value{ std::move( other.m_Value ) }
+    {
+        Emit( EventMoveConstructed{ m_Id, other.m_Id } );
+    }
+
+    ~SignalingT() noexcept( std::is_nothrow_destructible_v<T> )
+    {
+        Emit( EventDestroyed{ m_Id } );
+    }
+
+    explicit SignalingT( T value ) noexcept( std::is_nothrow_copy_constructible_v<T> &&
+                                             std::is_nothrow_move_constructible_v<T> &&
+                                             std::is_nothrow_copy_assignable_v<T> &&
+                                             std::is_nothrow_move_assignable_v<T> )
+        : m_Value{ value }
+    {
+        Emit( EventValueConstructed{ m_Id, std::move( value ) } );
+    }
+
+    SignalingT &operator=( const SignalingT &other ) noexcept( std::is_nothrow_copy_assignable_v<T> )
+    {
+        m_Value = other.m_Value;
+        Emit( EventCopyAssigned{ m_Id, other.m_Id } );
+    }
+
+    SignalingT &operator=( SignalingT &&other ) noexcept( std::is_nothrow_move_assignable_v<T> )
+    {
+        m_Value = std::move( other.m_Value );
+        Emit( EventMoveAssigned{ m_Id, other.m_Id } );
+    }
+
+    SignalingT &operator=( T value ) noexcept( std::is_nothrow_copy_assignable_v<T> &&
+                                               std::is_nothrow_move_assignable_v<T> )
+    {
+        m_Value = value;
+        Emit( EventValueAssigned{ m_Id, std::move( value ) } );
+    }
+
+    EventListener Listen()
+    {
+        return { EventListenerConstructorKey{} };
+    };
+
+    friend void swap( SignalingT &lhs, SignalingT &rhs ) noexcept( std::is_nothrow_swappable_v<T> )
+    {
+        using std::swap;
+        swap( lhs.m_Value, rhs.m_Value );
+        Emit( EventSwapped{ lhs.m_Id, rhs.m_Id } );
+    }
+
+private:
+    static Event Emit( Event event )
+    {
+        for ( const auto &listener : s_EventListeners )
+            listener.push_back( event );
+    }
+
+    inline static IdT s_IdCounter{};
+    inline static std::unordered_set<EventListener *> s_EventListeners{};
+
+    IdT m_Id{ s_IdCounter++ };
+    T m_Value{};
+};
+
+} // namespace kts
