@@ -67,9 +67,15 @@ public:
         IdT id;
     };
 
-    using Event =
-        std::variant<EventDefaultConstructed, EventCopyConstructed, EventMoveConstructed, EventValueConstructed,
-                     EventCopyAssigned, EventMoveAssigned, EventValueAssigned, EventSwapped, EventDestroyed>;
+    struct EventCompared
+    {
+        IdT id;
+        IdT id_with;
+    };
+
+    using Event = std::variant<EventDefaultConstructed, EventCopyConstructed, EventMoveConstructed,
+                               EventValueConstructed, EventCopyAssigned, EventMoveAssigned, EventValueAssigned,
+                               EventSwapped, EventDestroyed, EventCompared>;
 
 private:
     struct EventListenerConstructorKey
@@ -131,10 +137,9 @@ public:
         Emit( EventDestroyed{ m_Id } );
     }
 
-    explicit SignalingT( T value ) noexcept( std::is_nothrow_copy_constructible_v<T> &&
-                                             std::is_nothrow_move_constructible_v<T> &&
-                                             std::is_nothrow_copy_assignable_v<T> &&
-                                             std::is_nothrow_move_assignable_v<T> )
+    explicit SignalingT( T value )
+        noexcept( std::is_nothrow_copy_constructible_v<T> && std::is_nothrow_move_constructible_v<T> &&
+                  std::is_nothrow_copy_assignable_v<T> && std::is_nothrow_move_assignable_v<T> )
         : m_Value{ value }
     {
         Emit( EventValueConstructed{ m_Id, std::move( value ) } );
@@ -144,19 +149,22 @@ public:
     {
         m_Value = other.m_Value;
         Emit( EventCopyAssigned{ m_Id, other.m_Id } );
+        return *this;
     }
 
     SignalingT &operator=( SignalingT &&other ) noexcept( std::is_nothrow_move_assignable_v<T> )
     {
         m_Value = std::move( other.m_Value );
         Emit( EventMoveAssigned{ m_Id, other.m_Id } );
+        return *this;
     }
 
-    SignalingT &operator=( T value ) noexcept( std::is_nothrow_copy_assignable_v<T> &&
-                                               std::is_nothrow_move_assignable_v<T> )
+    SignalingT &operator=( T value )
+        noexcept( std::is_nothrow_copy_assignable_v<T> && std::is_nothrow_move_assignable_v<T> )
     {
         m_Value = value;
         Emit( EventValueAssigned{ m_Id, std::move( value ) } );
+        return *this;
     }
 
     EventListener Listen()
@@ -169,6 +177,48 @@ public:
         using std::swap;
         swap( lhs.m_Value, rhs.m_Value );
         Emit( EventSwapped{ lhs.m_Id, rhs.m_Id } );
+    }
+
+    friend bool operator==( const SignalingT &lhs, const SignalingT &rhs )
+        noexcept( noexcept( std::declval<T>() == std::declval<T>() ) )
+    {
+        Emit( EventCompared{ lhs.m_Id, rhs.m_Id } );
+        return lhs.m_Value == rhs.m_Value;
+    }
+
+    friend bool operator!=( const SignalingT &lhs, const SignalingT &rhs )
+        noexcept( noexcept( std::declval<T>() != std::declval<T>() ) )
+    {
+        Emit( EventCompared{ lhs.m_Id, rhs.m_Id } );
+        return lhs.m_Value != rhs.m_Value;
+    }
+
+    friend bool operator<( const SignalingT &lhs, const SignalingT &rhs )
+        noexcept( noexcept( std::declval<T>() < std::declval<T>() ) )
+    {
+        Emit( EventCompared{ lhs.m_Id, rhs.m_Id } );
+        return lhs.m_Value < rhs.m_Value;
+    }
+
+    friend bool operator<=( const SignalingT &lhs, const SignalingT &rhs )
+        noexcept( noexcept( std::declval<T>() <= std::declval<T>() ) )
+    {
+        Emit( EventCompared{ lhs.m_Id, rhs.m_Id } );
+        return lhs.m_Value <= rhs.m_Value;
+    }
+
+    friend bool operator>( const SignalingT &lhs, const SignalingT &rhs )
+        noexcept( noexcept( std::declval<T>() > std::declval<T>() ) )
+    {
+        Emit( EventCompared{ lhs.m_Id, rhs.m_Id } );
+        return lhs.m_Value > rhs.m_Value;
+    }
+
+    friend bool operator>=( const SignalingT &lhs, const SignalingT &rhs )
+        noexcept( noexcept( std::declval<T>() >= std::declval<T>() ) )
+    {
+        Emit( EventCompared{ lhs.m_Id, rhs.m_Id } );
+        return lhs.m_Value >= rhs.m_Value;
     }
 
 private:
