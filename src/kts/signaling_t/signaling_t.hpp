@@ -111,6 +111,16 @@ public:
             s_EventListeners.erase( this );
         }
 
+        auto &getEvents() noexcept
+        {
+            return events;
+        }
+
+        const auto &getEvents() const noexcept
+        {
+            return events;
+        }
+
     private:
         std::queue<Event> events;
     };
