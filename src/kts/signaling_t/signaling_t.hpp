@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstdint>
-#include <queue>
+#include <deque>
 #include <unordered_set>
 #include <utility>
 #include <variant>
@@ -122,7 +122,7 @@ public:
         }
 
     private:
-        std::queue<Event> events;
+        std::deque<Event> events;
     };
 
     SignalingT() noexcept( std::is_nothrow_default_constructible_v<T> )
@@ -177,10 +177,20 @@ public:
         return *this;
     }
 
-    EventListener Listen()
+    static EventListener Listen()
     {
         return { EventListenerConstructorKey{} };
     };
+
+    const IdT &getId() const noexcept
+    {
+        return m_Id;
+    }
+
+    const T &getValue() const noexcept
+    {
+        return m_Value;
+    }
 
     friend void swap( SignalingT &lhs, SignalingT &rhs ) noexcept( std::is_nothrow_swappable_v<T> )
     {
@@ -232,10 +242,10 @@ public:
     }
 
 private:
-    static Event Emit( Event event )
+    static void Emit( Event event )
     {
-        for ( const auto &listener : s_EventListeners )
-            listener.push_back( event );
+        for ( auto &listener : s_EventListeners )
+            listener->getEvents().push_back( event );
     }
 
     inline static IdT s_IdCounter{};
