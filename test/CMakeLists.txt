@@ -10,6 +10,7 @@ FetchContent_MakeAvailable(GoogleTest)
 
 add_executable(test-signaling_t test_signaling_t.cpp)
 
+target_compile_features(test-signaling_t PRIVATE cxx_std_17)
 target_link_libraries(test-signaling_t PRIVATE Kts::SignalingT gtest_main)
 
 include(GoogleTest)

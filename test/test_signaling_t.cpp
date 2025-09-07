@@ -8,7 +8,7 @@ template<typename T>
 class LoggingListener : public kts::SignalingT<T>::Listener
 {
 public:
-    void Update( const kts::SignalingT<T>::Event &event ) override
+    void Update( const typename kts::SignalingT<T>::Event &event ) override
     {
         events.emplace_back( event );
     }
