@@ -5,6 +5,29 @@
 #include <kts/signaling_t/signaling_t.hpp>
 
 template<typename T>
+class LoggingListener : public kts::SignalingT<T>::Listener
+{
+public:
+    void Update( const kts::SignalingT<T>::Event &event ) override
+    {
+        events.emplace_back( event );
+    }
+
+    auto &getEvents()
+    {
+        return events;
+    }
+
+    const auto &getEvents() const
+    {
+        return events;
+    }
+
+private:
+    std::deque<typename kts::SignalingT<T>::Event> events;
+};
+
+template<typename T>
 class SignalingTTest : public ::testing::Test
 {
 protected:
@@ -31,7 +54,7 @@ TYPED_TEST( SignalingTTest, AllOperationsOnce )
     kts::SignalingT<T> compare_this1;
     kts::SignalingT<T> compare_this2;
 
-    auto listener{ kts::SignalingT<T>::Listen() };
+    auto listener = LoggingListener<T>{};
     kts::SignalingT<T> default_constructed;
     kts::SignalingT<T> copy_constructed{ default_constructed };
     kts::SignalingT<T> move_constructed{ std::move( move_from_this1 ) };

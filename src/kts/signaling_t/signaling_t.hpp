@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <utility>
 #include <variant>
+#include <mutex>
 
 namespace kts
 {
@@ -77,52 +78,36 @@ public:
                                EventValueConstructed, EventCopyAssigned, EventMoveAssigned, EventValueAssigned,
                                EventSwapped, EventDestroyed, EventCompared>;
 
-private:
-    struct EventListenerConstructorKey
-    {
-    };
-
 public:
-    class EventListener
+    class Listener
     {
     public:
-        EventListener( [[maybe_unused]] EventListenerConstructorKey )
+        Listener()
         {
             Connect();
         }
 
-        EventListener( const EventListener & ) = delete;
-        EventListener( EventListener && ) = delete;
-        EventListener &operator=( const EventListener & ) = delete;
-        EventListener &operator=( EventListener && ) = delete;
+        Listener( const Listener & ) = delete;
+        Listener( Listener && ) = delete;
+        Listener &operator=( const Listener & ) = delete;
+        Listener &operator=( Listener && ) = delete;
 
-        ~EventListener()
+        virtual ~Listener()
         {
             Disconnect();
         }
 
         void Connect()
         {
-            s_EventListeners.emplace( this );
+            SignalingT::Attach( this );
         }
 
         void Disconnect()
         {
-            s_EventListeners.erase( this );
+            SignalingT::Detach( this );
         }
 
-        auto &getEvents() noexcept
-        {
-            return events;
-        }
-
-        const auto &getEvents() const noexcept
-        {
-            return events;
-        }
-
-    private:
-        std::deque<Event> events;
+        virtual void Update( const Event &event ) = 0;
     };
 
     SignalingT() noexcept( std::is_nothrow_default_constructible_v<T> )
@@ -176,11 +161,6 @@ public:
         Emit( EventValueAssigned{ m_Id, std::move( value ) } );
         return *this;
     }
-
-    static EventListener Listen()
-    {
-        return { EventListenerConstructorKey{} };
-    };
 
     const IdT &getId() const noexcept
     {
@@ -241,15 +221,29 @@ public:
         return lhs.m_Value >= rhs.m_Value;
     }
 
+    static void Attach( Listener *listener )
+    {
+        std::lock_guard lock{ s_Mutex };
+        s_Listeners.emplace( listener );
+    }
+
+    static void Detach( Listener *listener )
+    {
+        std::lock_guard lock{ s_Mutex };
+        s_Listeners.erase( listener );
+    }
+
 private:
     static void Emit( Event event )
     {
-        for ( auto &listener : s_EventListeners )
-            listener->getEvents().push_back( event );
+        std::lock_guard lock{ s_Mutex };
+        for ( auto &listener : s_Listeners )
+            listener->Update( event );
     }
 
     inline static IdT s_IdCounter{};
-    inline static std::unordered_set<EventListener *> s_EventListeners{};
+    inline static std::unordered_set<Listener *> s_Listeners{};
+    inline static std::mutex s_Mutex;
 
     IdT m_Id{ s_IdCounter++ };
     T m_Value{};
