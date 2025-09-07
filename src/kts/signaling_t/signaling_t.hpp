@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <deque>
 #include <unordered_set>
 #include <utility>
 #include <variant>
