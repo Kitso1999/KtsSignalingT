@@ -71,7 +71,7 @@ public:
     struct EventCompared
     {
         IdT id;
-        IdT id_with;
+        IdT with_id;
     };
 
     using Event = std::variant<EventDefaultConstructed, EventCopyConstructed, EventMoveConstructed,
